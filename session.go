@@ -103,7 +103,7 @@ func addrsToHosts(addrs []string, defaultPort int) ([]*HostInfo, error) {
 }
 
 // NewSession wraps an existing Node.
-func NewSession(cfg ClusterConfig) (*Session, error) {
+func NewSession(cfg ClusterConfig) (_ *Session, err error) {
 	// Check that hosts in the ClusterConfig is not empty
 	if len(cfg.Hosts) < 1 {
 		return nil, ErrNoHosts
@@ -127,6 +127,13 @@ func NewSession(cfg ClusterConfig) (*Session, error) {
 		ctx:             ctx,
 		cancel:          cancel,
 	}
+
+	// Close created resources on error otherwise they'll leak
+	defer func() {
+		if err != nil {
+			s.Close()
+		}
+	}()
 
 	s.schemaDescriber = newSchemaDescriber(s)
 
@@ -164,7 +171,6 @@ func NewSession(cfg ClusterConfig) (*Session, error) {
 	s.connCfg = connCfg
 
 	if err := s.init(); err != nil {
-		s.Close()
 		if err == ErrNoConnectionsStarted {
 			//This error used to be generated inside NewSession & returned directly
 			//Forward it on up to be backwards compatible
